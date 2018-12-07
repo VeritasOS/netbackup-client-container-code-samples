@@ -1,0 +1,90 @@
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: __USER__-nb-client-pvc
+  labels:
+    app: nb-client
+    uniq: __UNIQUE__
+spec:
+  accessModes:
+  - ReadWriteMany
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: nfs
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: __USER__-nb-dump-pvc
+  labels:
+    app: nb-client
+    uniq: __UNIQUE__
+spec:
+  accessModes:
+  - ReadWriteMany
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: nfs
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: __USER__-nb-client-pod
+  labels:
+    app: nb-client
+    ver: 8.1.2
+    uniq: __UNIQUE__
+    pod: __USER__-nb-client-pod
+spec:
+  hostname: __SHORT_CLIENT__
+  volumes:
+  - name: __USER__-nb-client-vol
+    persistentVolumeClaim:
+      claimName: __USER__-nb-client-pvc
+  - name: __USER__-nb-dump-vol
+    persistentVolumeClaim:
+      claimName: __USER__-nb-dump-pvc
+  containers:
+  - name: __USER__-nb-client
+    image: store/veritasnetbackup/client:8.1.2 
+    command: [ "/entrypoint.sh" ]
+    args: [ "-M", "__MASTER__", "-c", "__CLIENT__" ]
+    livenessProbe:
+      exec:
+        command:
+        - /health.sh
+      initialDelaySeconds: 60
+      periodSeconds: 180
+    volumeMounts:
+      - mountPath: /mnt/nblogs
+        subPath: nblogs
+        name: __USER__-nb-client-vol
+      - mountPath: /mnt/nbcfg
+        subPath: nbcfg
+        name: __USER__-nb-client-vol
+      - mountPath: /mnt/nbdata
+        subPath: nbdata
+        name: __USER__-nb-client-vol
+      - mountPath: /mnt/dump
+        name: __USER__-nb-dump-vol
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: __SHORT_CLIENT__
+  labels:
+    app: nb-client
+    uniq: __UNIQUE__
+spec:
+  type: LoadBalancer
+  loadBalancerIP: __IPADDR__
+  selector:
+    pod: __USER__-nb-client-pod
+  ports:
+  - name: pbx
+    port: 1556
+  - name: vnetd-nbrntd
+    port: 13724

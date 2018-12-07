@@ -1,0 +1,73 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: __NAME__-ss
+  labels:
+    uniq: __UNIQUE_ID__
+spec:
+  selector:
+    matchLabels:
+      role: __NAME__
+  serviceName: __NAME__-svc
+  replicas: __REPLICAS__
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        role: __NAME__
+        uniq: __UNIQUE_ID__
+    spec:
+      volumes:
+      - name: __USER__-nb-dump-vol
+        persistentVolumeClaim:
+          claimName: __USER__-nb-dump-pvc
+      terminationGracePeriodSeconds: 10
+      containers:
+        - name: __NAME__-cntnr
+          image: mongo
+          command:
+            - "numactl"
+            - "--interleave=all"
+            - "mongod"
+            - "--shardsvr"
+            - "--replSet"
+            - "__NAME__"
+            - "--bind_ip_all"
+            - "--port"
+            - "27017"
+          ports:
+            - containerPort: 27017
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sh", "-c", "rm -rfd /data/db/*"]
+          volumeMounts:           
+            - name: __NAME__-pvc
+              mountPath: /data/db
+            - name: __USER__-nb-dump-vol
+              mountPath: /mnt/dump
+  volumeClaimTemplates:
+  - metadata:
+      name: __NAME__-pvc
+    spec:
+      accessModes: [ "ReadWriteMany" ]
+      storageClassName: nfs
+      resources:
+        requests:
+          storage: 5Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: __NAME__-svc
+  labels:
+    name: __NAME__
+    uniq: __UNIQUE_ID__
+spec:
+  ports:
+  - port: 27017
+    targetPort: 27017
+  clusterIP: None
+  selector:
+    role: __NAME__
